@@ -1,0 +1,24 @@
+{
+  "name": "leetcode-battle-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "postinstall": "node -e \"console.log('If isolated-vm fails to build, set VM_MODE=vm in server/.env')\""
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "isolated-vm": "^5.0.1",
+    "nanoid": "^5.0.7",
+    "node-fetch": "^3.3.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
+

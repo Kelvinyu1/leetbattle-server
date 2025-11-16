@@ -1,0 +1,17 @@
+{
+  "slug": "valid-parentheses",
+  "title": "Valid Parentheses (MVP)",
+  "difficulty": "Easy",
+  "statement": "Given a string s containing just the characters '()[]{}', determine if the input string is valid.",
+  "starter_code": {
+    "python": "def isValid(s: str) -> bool:\n    # TODO: implement\n    return False"
+  },
+  "exportName": "isValid",
+  "tests": [
+    { "input": { "args": ["()"] }, "output": true },
+    { "input": { "args": ["()[]{}"] }, "output": true },
+    { "input": { "args": ["(]"] }, "output": false },
+    { "input": { "args": ["([{}])"] }, "output": true }
+  ]
+}
+
