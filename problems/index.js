@@ -107,7 +107,7 @@ function stripHtml(html) {
   // Normalize newlines
   text = text.replace(/\r\n/g, "\n");
 
-  // Collapse 3+ newlines → 2
+  // Collapse 3+ newlines into 2
   text = text.replace(/\n{3,}/g, "\n\n");
 
   return text.trim();
