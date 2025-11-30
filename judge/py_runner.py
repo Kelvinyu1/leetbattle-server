@@ -1,4 +1,5 @@
 import json, sys, signal, builtins, types, resource
+import typing
 
 # -------- time & memory limits --------
 # CPU seconds
@@ -40,11 +41,23 @@ ALLOWED_BUILTINS = {
     "sum": builtins.sum,
     "tuple": builtins.tuple,
     "zip": builtins.zip,
-    # no __import__, no open, no eval/exec again, etc.
+
+    "__build_class__": builtins.__build_class__,
+    "object": builtins.object,
+    "Exception": builtins.Exception,
+    "ValueError": builtins.ValueError,
+    "TypeError": builtins.TypeError,
+    "__import__": builtins.__import__,
 }
 
 safe_globals = {
     "__builtins__": ALLOWED_BUILTINS,
+    "__name__": "__main__", 
+    "List": typing.List,
+    "Dict": typing.Dict,
+    "Set": typing.Set,
+    "Tuple": typing.Tuple,
+    "Optional": typing.Optional,
 }
 safe_locals = {}
 
@@ -69,7 +82,11 @@ def run():
         fn = safe_globals[export_name]
     else:
         # fallback: try to find the only callable defined by user
-        candidates = [v for k, v in {**safe_globals, **safe_locals}.items() if callable(v)]
+        #candidates = [v for k, v in {**safe_globals, **safe_locals}.items() if callable(v)]
+        candidates = [
+            v for k, v in safe_locals.items()
+            if callable(v) and not k.startswith("__")
+        ]
         fn = candidates[-1] if candidates else None
 
     if not callable(fn):
@@ -94,7 +111,10 @@ def run():
             # count as fail; continue
             pass
 
-    verdict = "Accepted" if passed == len(tests) else "Wrong Answer"
+    if len(tests) == 0:
+        verdict = "Wrong Answer"
+    else:
+        verdict = "Accepted" if passed == len(tests) else "Wrong Answer"
     print(json.dumps({
         "verdict": verdict,
         "passCount": passed,
