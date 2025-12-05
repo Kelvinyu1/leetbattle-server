@@ -86,7 +86,6 @@ async function fetchProblem(slug) {
         difficulty
         content
         exampleTestcases
-        jsonExampleTestcases
         sampleTestCase
         metaData
         codeSnippets {
