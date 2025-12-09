@@ -148,48 +148,163 @@ function decodeHTML(html) {
     });
 };
 
+function extractTests(q) {
+  console.log("DEBUG: exampleTestcases:", q.exampleTestcases);
+  console.log("DEBUG: jsonExampleTestcases:", q.jsonExampleTestcases);
+  console.log("DEBUG: metaData:", q.metaData?.slice?.(0, 200) + "...");
+  console.log("DEBUG: content length:", q.content?.length);
+
+  const tests = [];
+
+  // 1. Parse metaData for params/paramCount
+  let meta = null;
+  let params = [];
+  let paramCount = 0;
+
+  try {
+    if (q.metaData) {
+      meta = JSON.parse(q.metaData);
+      params = meta.params ?? [];
+      paramCount = params.length;
+    }
+  } catch (err) {
+    console.error("Failed to parse metaData:", err);
+  }
+
+  // 2. Build INPUTS from jsonExampleTestcases OR exampleTestcases
+
+  try {
+    if (q.jsonExampleTestcases) {
+      // Preferred: structured JSON from LeetCode
+      const rawCases = JSON.parse(q.jsonExampleTestcases); // array of strings
+
+      for (const raw of rawCases) {
+        const lines = raw.trim().split("\n");
+        const args = [];
+
+        for (let i = 0; i < paramCount; i++) {
+          const line = lines[i] ?? "";
+          try {
+            args.push(JSON.parse(line));
+          } catch {
+            args.push(line);
+          }
+        }
+
+        if (args.length === paramCount) {
+          tests.push({
+            input: { args },
+            output: null
+          });
+        }
+      }
+    } else if (q.exampleTestcases) {
+      // Fallback: old field, often one big string with all examples
+      // Split by blank lines into blocks per example
+      const blocks = q.exampleTestcases.trim().split(/\n\s*\n/);
+
+      for (const block of blocks) {
+        const lines = block
+          .split("\n")
+          .map(l => l.trim())
+          .filter(Boolean);
+
+        const args = [];
+        for (let i = 0; i < paramCount; i++) {
+          const line = lines[i] ?? "";
+          try {
+            args.push(JSON.parse(line));
+          } catch {
+            args.push(line);
+          }
+        }
+
+        if (args.length === paramCount) {
+          tests.push({
+            input: { args },
+            output: null
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Failed while building tests from example testcases:", err);
+  }
+
+  // 3. Parse OUTPUTS from the statement and attach to tests
+  try {
+    const outputs = parseExampleOutputsFromContent(q.content);
+    console.log("DEBUG: parsed example outputs:", outputs);
+
+    for (let i = 0; i < tests.length && i < outputs.length; i++) {
+      const rawOut = outputs[i];
+
+      // Try to JSON-parse the output (so "[1,2]" or "2" becomes real values)
+      let parsedOut = rawOut;
+      try {
+        parsedOut = JSON.parse(rawOut);
+      } catch {
+        // leave as string if not valid JSON
+      }
+
+      tests[i].output = parsedOut;
+    }
+  } catch (err) {
+    console.error("Failed to parse/attach example outputs:", err);
+  }
+
+  if (!tests.length) {
+    console.warn("DEBUG: No tests could be extracted for this problem");
+  }
+
+  return tests;
+}
+
+
+
 /**
  *  Extract tests from LeetCode
  */
-function extractTests(q) {
-  // BEST CASE: jsonExampleTestcases exists
-  if (q.jsonExampleTestcases) {
-    try {
-      const parsed = JSON.parse(q.jsonExampleTestcases);
-      // Format into judge format
-      return parsed.map(test => ({
-        input: { args: Object.values(test.input) },
-        output: test.output
-      }));
-    } catch (err) {
-      console.error("Failed to parse jsonExampleTestcases:", err);
-    }
-  }
+// function extractTests(q) {
+//   console.log("DEBUG: exampleTestcaseList:", q.exampleTestcaseList);
+//   // BEST CASE: jsonExampleTestcases exists
+//   if (q.jsonExampleTestcases) {
+//     try {
+//       const parsed = JSON.parse(q.jsonExampleTestcases);
+//       // Format into judge format
+//       return parsed.map(test => ({
+//         input: { args: Object.values(test.input) },
+//         output: test.output
+//       }));
+//     } catch (err) {
+//       console.error("Failed to parse jsonExampleTestcases:", err);
+//     }
+//   }
 
-  // FALLBACK: Use exampleTestcases + metaData
-  if (q.exampleTestcases && q.metaData) {
-    try {
-      const meta = JSON.parse(q.metaData);
-      const paramCount = meta.params?.length || 0;
+//   // FALLBACK: Use exampleTestcases + metaData
+//   if (q.exampleTestcases && q.metaData) {
+//     try {
+//       const meta = JSON.parse(q.metaData);
+//       const paramCount = meta.params?.length || 0;
 
-      const lines = q.exampleTestcases.trim().split("\n");
-      if (lines.length >= paramCount) {
-        const args = lines.slice(0, paramCount).map(s => {
-          try { return JSON.parse(s); } catch { return s; }
-        });
-        return [{
-          input: { args },
-          output: null   // no official output provided
-        }];
-      }
-    } catch (err) {
-      console.error("Meta parsing error:", err);
-    }
-  }
+//       const lines = q.exampleTestcases.trim().split("\n");
+//       if (lines.length >= paramCount) {
+//         const args = lines.slice(0, paramCount).map(s => {
+//           try { return JSON.parse(s); } catch { return s; }
+//         });
+//         return [{
+//           input: { args },
+//           output: null   // no official output provided
+//         }];
+//       }
+//     } catch (err) {
+//       console.error("Meta parsing error:", err);
+//     }
+//   }
 
-  // If nothing found 
-  return [];
-}
+//   // If nothing found 
+//   return [];
+// }
 
 /**
  * Robustly clean Python starter code:
@@ -305,6 +420,31 @@ function cleanPythonStarter(raw) {
 
   return code.trim();
 }
+
+
+function parseExampleOutputsFromContent(html) {
+  if (!html) return [];
+
+  // Reuse your existing helper to get plain text
+  const text = stripHtml(html);
+  const lines = text
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  const outputs = [];
+
+  // Very simple heuristic: grab all lines like "Output: xxx"
+  for (const line of lines) {
+    const m = /^output:\s*(.+)$/i.exec(line);
+    if (m) {
+      outputs.push(m[1]);
+    }
+  }
+
+  return outputs;
+}
+
 
 /**
  * Step 3: Transform into your desired format
