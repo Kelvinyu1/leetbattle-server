@@ -1,5 +1,6 @@
 import json, sys, signal, builtins, types, resource
 import typing
+from collections import defaultdict
 
 # -------- time & memory limits --------
 # CPU seconds
@@ -57,6 +58,7 @@ safe_globals = {
     "Dict": typing.Dict,
     "Set": typing.Set,
     "Deque": typing.Deque,
+    "defaultdict": defaultdict,
     "Tuple": typing.Tuple,
     "Optional": typing.Optional,
 }
