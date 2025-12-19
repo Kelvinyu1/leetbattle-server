@@ -5,6 +5,8 @@ const { nanoid } = require('nanoid');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 
+const matches = new Map();
+
 dotenv.config();
 
 // Connect to MongoDB
@@ -99,17 +101,24 @@ async function startRound(roomId, countdownSeconds = 900) {
 
   if (sockets.length < 2) return; // need 2 players
 
+  let match = matches.get(roomId);
+
+  if (!match) {
+    match = { players: sockets.map(s => ({ id: s.data.userId, name: userNames.get(s.data.userId) || 'Player', score: 0 })) };
+    matches.set(roomId, match);
+  }
+
   const problem = await getRandomProblem(true);
   sockets.forEach(s => (s.data.__problem = problem));
 
-  const players = sockets.map(s => ({ id: s.data.userId, name: userNames.get(s.data.userId) || 'Player' }));
   const payload = {
     matchId: nanoid(),
     roomId,
-    players,
+    players: match.players,
     problem: safeProblem(problem),
     countdownSeconds
   };
+
 
   io.to(roomId).emit('match.start', payload);
   startTimer(roomId, countdownSeconds);
@@ -122,7 +131,7 @@ async function registerUser(username, password) {
     if (existing) {
       return { success: false, error: 'Username already taken' };
     }
-    
+
     // Save to DB
     const user = new User({ username, password });
     await user.save();
@@ -140,7 +149,7 @@ async function loginUser(username, password) {
       return { success: false, error: 'User not found' };
     }
 
-    const isMatch = user.comparePassword(password); 
+    const isMatch = user.comparePassword(password);
     if (!isMatch) {
       return { success: false, error: 'Invalid password' };
     }
@@ -249,6 +258,12 @@ io.on('connection', (socket) => {
         const loserSocket = sockets.find(s => s.data.userId !== winnerId);
         const loserId = loserSocket ? loserSocket.data.userId : null;
 
+        const match = matches.get(roomId);
+        if (!match) return;
+
+        const winner = match.players.find(p => p.id === winnerId);
+        if (winner) winner.score += 1;
+
         // Update stats in database
         if (socket.data.dbUserId) {
           await updateUserStats(socket.data.dbUserId, true);
@@ -272,7 +287,7 @@ io.on('connection', (socket) => {
         }
         await broadcastScoreboard();
 
-        io.to(roomId).emit('match.over', { winnerId, reason: 'first-accept' });
+        io.to(roomId).emit('match.over', { winnerId, players: match.players, reason: 'first-accept' });
       }
     } catch (e) {
       io.to(roomId).emit('submission.result', {
