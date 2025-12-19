@@ -28,13 +28,15 @@ async function lcQuery(query, variables = {}) {
 async function fetchAllProblems() {
   const query = `
     query problemsetQuestionListV2($limit: Int, $skip: Int) {
-      problemsetQuestionListV2: problemsetQuestionListV2(
+      problemsetQuestionListV2(
         categorySlug: ""
         limit: $limit
         skip: $skip
       ) {
         questions {
           titleSlug
+          paidOnly
+          
         }
       }
     }
@@ -45,17 +47,34 @@ async function fetchAllProblems() {
   let slugs = [];
 
   while (true) {
+    console.log(`Fetching questions starting at ${skip}...`);
     const data = await lcQuery(query, { limit, skip });
     const questions = data.problemsetQuestionListV2.questions;
 
     if (!questions || questions.length === 0) break;
 
-    slugs.push(...questions.map(q => q.titleSlug));
+    // --- FILTERING LOGIC ---
+    const filteredQuestions = questions.filter(q => {
+      const isSql = q.categoryTitle === "Database";
+      const isPremium = q.paidOnly === true;
+
+      // Only return true if it is NOT SQL and NOT Premium
+      return !isSql && !isPremium;
+    });
+
+    slugs.push(...filteredQuestions.map(q => q.titleSlug));
+    
+    // LeetCode limits results, but we increment by the original limit to paginate correctly
     skip += limit;
+    
+    // Safety break for testing (remove this if you want all thousands of problems)
+    if (skip > 500) break; 
   }
 
   return slugs;
 }
+
+fetchAllProblems().then(slugs => console.log(`Total filtered problems: ${slugs.length}`));
 
 /**
  * Step 2: Fetch full question data by slug
@@ -237,17 +256,8 @@ function extractTests(q) {
     console.log("DEBUG: parsed example outputs:", outputs);
 
     for (let i = 0; i < tests.length && i < outputs.length; i++) {
-      const rawOut = outputs[i];
-
-      // Try to JSON-parse the output (so "[1,2]" or "2" becomes real values)
-      let parsedOut = rawOut;
-      try {
-        parsedOut = JSON.parse(rawOut);
-      } catch {
-        // leave as string if not valid JSON
-      }
-
-      tests[i].output = parsedOut;
+      // Output is already parsed by parseExampleOutputsFromContent
+      tests[i].output = outputs[i];
     }
   } catch (err) {
     console.error("Failed to parse/attach example outputs:", err);
@@ -258,6 +268,44 @@ function extractTests(q) {
   }
 
   return tests;
+}
+
+function parseExampleOutputsFromContent(html) {
+  if (!html) return [];
+
+  // Reuse your existing helper to get plain text
+  const text = stripHtml(html);
+  const lines = text
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  const outputs = [];
+
+  // Very simple heuristic: grab all lines like "Output: xxx"
+  for (const line of lines) {
+    const m = /^output:\s*(.+)$/i.exec(line);
+    if (m) {
+      let rawOutput = m[1].trim();
+      
+      // Try to parse as JSON to get the actual value
+      // This handles cases like:
+      // - Output: "1342" -> becomes string "1342"
+      // - Output: [1,2,3] -> becomes array [1,2,3]
+      // - Output: true -> becomes boolean true
+      // - Output: 42 -> becomes number 42
+      try {
+        const parsed = JSON.parse(rawOutput);
+        outputs.push(parsed);
+      } catch {
+        // If it's not valid JSON, keep as-is
+        // This handles cases like plain text without quotes
+        outputs.push(rawOutput);
+      }
+    }
+  }
+
+  return outputs;
 }
 
 
@@ -422,28 +470,28 @@ function cleanPythonStarter(raw) {
 }
 
 
-function parseExampleOutputsFromContent(html) {
-  if (!html) return [];
+// function parseExampleOutputsFromContent(html) {
+//   if (!html) return [];
 
-  // Reuse your existing helper to get plain text
-  const text = stripHtml(html);
-  const lines = text
-    .split("\n")
-    .map(l => l.trim())
-    .filter(Boolean);
+//   // Reuse your existing helper to get plain text
+//   const text = stripHtml(html);
+//   const lines = text
+//     .split("\n")
+//     .map(l => l.trim())
+//     .filter(Boolean);
 
-  const outputs = [];
+//   const outputs = [];
 
-  // Very simple heuristic: grab all lines like "Output: xxx"
-  for (const line of lines) {
-    const m = /^output:\s*(.+)$/i.exec(line);
-    if (m) {
-      outputs.push(m[1]);
-    }
-  }
+//   // Very simple heuristic: grab all lines like "Output: xxx"
+//   for (const line of lines) {
+//     const m = /^output:\s*(.+)$/i.exec(line);
+//     if (m) {
+//       outputs.push(m[1]);
+//     }
+//   }
 
-  return outputs;
-}
+//   return outputs;
+// }
 
 
 /**
