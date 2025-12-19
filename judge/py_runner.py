@@ -15,7 +15,7 @@ def _timeout(signum, frame):
 signal.signal(signal.SIGALRM, _timeout)
 signal.alarm(3)  # wall timeout ~3s
 
-# -------- very restricted builtins --------
+# very restricted builtins 
 ALLOWED_BUILTINS = {
     "abs": builtins.abs,
     "all": builtins.all,
@@ -56,6 +56,7 @@ safe_globals = {
     "List": typing.List,
     "Dict": typing.Dict,
     "Set": typing.Set,
+    "Deque": typing.Deque,
     "Tuple": typing.Tuple,
     "Optional": typing.Optional,
 }

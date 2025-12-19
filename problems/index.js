@@ -36,7 +36,9 @@ async function fetchAllProblems() {
         questions {
           titleSlug
           paidOnly
-          
+          topicTags {
+            name
+          }
         }
       }
     }
@@ -53,22 +55,22 @@ async function fetchAllProblems() {
 
     if (!questions || questions.length === 0) break;
 
-    // --- FILTERING LOGIC ---
+    // FILTERING LOGIC
     const filteredQuestions = questions.filter(q => {
-      const isSql = q.categoryTitle === "Database";
       const isPremium = q.paidOnly === true;
-
-      // Only return true if it is NOT SQL and NOT Premium
-      return !isSql && !isPremium;
+      const forbiddenTags = ["Linked List", "Tree", "Binary Tree", "Database", "Shell"];
+      const hasForbiddenTag = q.topicTags.some(tag => 
+        forbiddenTags.includes(tag.name)
+      );
+      return !hasForbiddenTag && !isPremium;
     });
 
     slugs.push(...filteredQuestions.map(q => q.titleSlug));
     
-    // LeetCode limits results, but we increment by the original limit to paginate correctly
     skip += limit;
     
-    // Safety break for testing (remove this if you want all thousands of problems)
-    if (skip > 500) break; 
+    // Max amount of questions
+    if (skip > 1000) break; 
   }
 
   return slugs;
