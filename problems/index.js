@@ -58,7 +58,7 @@ async function fetchAllProblems() {
     // FILTERING LOGIC
     const filteredQuestions = questions.filter(q => {
       const isPremium = q.paidOnly === true;
-      const forbiddenTags = ["Linked List", "Tree", "Binary Tree", "Database", "Shell"];
+      const forbiddenTags = ["Linked List", "Tree", "Binary Tree", "Database", "Shell", "Design"];
       const hasForbiddenTag = q.topicTags.some(tag => 
         forbiddenTags.includes(tag.name)
       );
